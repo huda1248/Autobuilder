@@ -1,1 +1,6 @@
 *.zip
+
+# ignore archives
+*.zip
+*.tar
+*.tar.gz
