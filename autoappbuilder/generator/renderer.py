@@ -34,3 +34,11 @@ class TemplateRenderer:
             template = self.env.get_template(str(Path(template_name) / rel))
             dst_path.parent.mkdir(parents=True, exist_ok=True)
             dst_path.write_text(template.render(**context), encoding="utf-8")
+
+            template = self.env.get_template(str(Path(template_name) / rel))
+            dst_path.parent.mkdir(parents=True, exist_ok=True)
+
+if dst_path.suffix == ".j2":
+    dst_path = dst_path.with_suffix("")
+
+dst_path.write_text(template.render(**context), encoding="utf-8")
