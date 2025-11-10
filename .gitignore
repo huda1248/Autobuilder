@@ -1,11 +1,9 @@
+__pycache__/
+.pytest_cache/
+.venv/
+dist/
+build/
+*.egg-info/
+.DS_Store
+.env
 *.zip
-
-# ignore archives
-*.zip
-*.tar
-*.tar.gz
-
-# ignore archives
-*.zip
-*.tar
-*.tar.gz

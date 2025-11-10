@@ -1,0 +1,25 @@
+[project]
+name = "autobuilder"
+version = "0.1.0"
+description = "Autoappbuilder MVP Plus"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "fastapi==0.115.5",
+    "uvicorn==0.32.1",
+    "jinja2==3.1.4",
+    "pydantic==2.9.2",
+    "typer==0.12.5",
+    "requests==2.32.3",
+]
+
+[project.scripts]
+autobuilder = "autoappbuilder.generator.cli:main"
+
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["autoappbuilder*"]
