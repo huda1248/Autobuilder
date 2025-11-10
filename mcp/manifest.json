@@ -1,0 +1,18 @@
+{
+  "name": "autobuild",
+  "version": "0.1.0",
+  "tools": [
+    {"name":"tools.applyPatch","description":"Apply a unified diff to the current project"},
+    {"name":"tools.commit","description":"Commit staged changes"},
+    {"name":"tools.push","description":"Push current branch"},
+    {"name":"tools.openPR","description":"Open a PR using gh CLI"},
+    {"name":"tools.scaffold","description":"Run autobuilder scaffold"},
+    {"name":"tools.devApi","description":"Start FastAPI with Uvicorn on a port"},
+    {"name":"mpc.list","description":"List configured projects"},
+    {"name":"mpc.use","description":"Select active project"},
+    {"name":"git.status","description":"Git status of active project"}
+  ],
+  "command": "python",
+  "args": ["tools/mcp_server.py"],
+  "workingDirectory": "."
+}
