@@ -1,7 +1,14 @@
 from __future__ import annotations
-import asyncio, os, sys, shlex
+import asyncio, os, sys, shlex, threading
 from pathlib import Path
 import yaml
+
+# NEW: real ChatGPT window
+try:
+    import webview  # pip install pywebview
+    _WEBVIEW_OK = True
+except Exception:
+    _WEBVIEW_OK = False
 
 from textual.app import App, ComposeResult
 from textual.reactive import reactive
@@ -43,6 +50,8 @@ class Toolbar(Horizontal):
         yield Button("Scaffold", id="scaffold")
         yield Input(placeholder="name (e.g., hello_world)", id="sc-name")
         yield Input(placeholder="out dir (e.g., ./out_cli)", id="sc-out")
+        # NEW: ChatGPT button to open chatgpt.com in a native window
+        yield Button("ChatGPT", id="chatgpt")
 
 class GitBar(Horizontal):
     def compose(self) -> ComposeResult:
@@ -150,6 +159,27 @@ class AutobuildApp(App):
             if helper.exists():
                 await self.run_stream([str(helper)], self.active_path)
             await self.run_stream(["uvicorn","autoappbuilder.api.app:app","--reload","--port",port], self.active_path); return
+
+        # NEW: open ChatGPT in a native WebKit window (via pywebview)
+        if bid == "chatgpt":
+            if not _WEBVIEW_OK:
+                self.log("[ERROR] pywebview not installed. Run: python -m pip install pywebview\n")
+                return
+            def _open():
+                try:
+                    webview.create_window(
+                        "ChatGPT",
+                        "https://chatgpt.com",
+                        width=1200,
+                        height=800,
+                    )
+                    # Explicit Cocoa backend for macOS
+                    webview.start(gui='cocoa')
+                except Exception as e:
+                    self.log(f"[ERROR] webview failed: {e}\n")
+            threading.Thread(target=_open, daemon=True).start()
+            self.log("🌐 ChatGPT window opened.\n")
+            return
 
 if __name__ == "__main__":
     AutobuildApp().run()
