@@ -85,7 +85,9 @@ class App(tk.Tk):
 
         ttk.Label(top, text="Active:").pack(side="left", padx=12)
         self.active_lbl = ttk.Label(top, text=str(self.active), foreground="green")
+        ttk.Button(top, text="Open ChatGPT", command=self.open_chatgpt).pack(side="right", padx=6)
         self.active_lbl.pack(side="left", padx=4)
+        
 
         # Build tag banner (so you can SEE freshness)
         banner = ttk.Frame(self)
