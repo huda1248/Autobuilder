@@ -3,12 +3,12 @@ import os, sys, subprocess, threading, queue
 from pathlib import Path
 import yaml
 
-from PySide6.QtCore import Qt, QUrl, QProcess, QTimer, QDir
+from PySide6.QtCore import Qt, QUrl, QTimer, QDir
 from PySide6.QtGui import QAction, QFont, QTextOption
 from PySide6.QtWidgets import (
     QApplication, QWidget, QMainWindow, QSplitter, QFileSystemModel, QTreeView,
     QPlainTextEdit, QLineEdit, QToolBar, QLabel, QPushButton, QHBoxLayout,
-    QVBoxLayout, QFileDialog, QMessageBox, QSizePolicy, QTabWidget
+    QVBoxLayout, QFileDialog, QMessageBox, QTabWidget
 )
 from PySide6.QtWebEngineWidgets import QWebEngineView
 
@@ -32,15 +32,17 @@ def projects():
 
 def write_cur(p: Path): CUR.write_text(str(p), encoding="utf-8")
 def read_cur() -> Path:
-    try: return Path(CUR.read_text(encoding="utf-8").strip()).expanduser().resolve()
-    except Exception: return ROOT
+    try:
+        return Path(CUR.read_text(encoding="utf-8").strip()).expanduser().resolve()
+    except Exception:
+        return ROOT
 
 class Editor(QPlainTextEdit):
     def __init__(self):
         super().__init__()
         self.setFont(QFont("Menlo", 12))
         self.setWordWrapMode(QTextOption.NoWrap)
-        self._path: Path|None = None
+        self._path: Path | None = None
 
     def load(self, p: Path):
         try:
@@ -53,7 +55,8 @@ class Editor(QPlainTextEdit):
     def save(self):
         if not self._path:
             f, _ = QFileDialog.getSaveFileName(self, "Save file as")
-            if not f: return
+            if not f:
+                return
             self._path = Path(f)
         self._path.write_text(self.toPlainText(), encoding="utf-8")
 
@@ -73,7 +76,13 @@ class Console(QPlainTextEdit):
 def run_stream(cmd: str, cwd: Path, out: Console):
     def worker():
         out.write(f"> {cmd}\n(in {cwd})\n")
-        proc = subprocess.Popen(["bash","-lc", cmd], cwd=cwd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        proc = subprocess.Popen(
+            ["bash","-lc", cmd],
+            cwd=cwd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True
+        )
         assert proc.stdout
         for line in proc.stdout:
             out.write(line)
@@ -118,8 +127,10 @@ class Main(QMainWindow):
         outer.setStretchFactor(0, 1); outer.setStretchFactor(1, 0)
 
         # Left: file tree
-        self.fs = QFileSystemModel(); self.fs.setRootPath(str(self.active))
-        self.fs.setFilter(self.fs.filter() | self.fs.Dirs | self.fs.Files)
+        self.fs = QFileSystemModel()
+        self.fs.setRootPath(str(self.active))
+        # ✅ Use QDir flags (not QFileSystemModel attributes)
+        self.fs.setFilter(QDir.AllDirs | QDir.NoDotAndDotDot | QDir.Files)
         self.tree = QTreeView(); self.tree.setModel(self.fs)
         self.tree.setRootIndex(self.fs.index(str(self.active)))
         self.tree.doubleClicked.connect(self.open_from_tree)
@@ -171,8 +182,11 @@ class Main(QMainWindow):
             self._api_proc.terminate(); self._api_proc = None
             self.console.write("API stopped\n"); return
         port = self.api.text().strip() or "8080"
-        self._api_proc = subprocess.Popen(["bash","-lc", f"python -m http.server {port}"], cwd=str(self.active),
-                                          stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True)
+        self._api_proc = subprocess.Popen(
+            ["bash","-lc", f"python -m http.server {port}"],
+            cwd=str(self.active),
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+        )
         def pump():
             for line in self._api_proc.stdout:  # type: ignore
                 self.console.write(line)
@@ -192,7 +206,8 @@ class Main(QMainWindow):
 
     def send_api(self):
         text = self.chat_input.text().strip()
-        if not text: return
+        if not text: 
+            return
         self.chat_input.clear()
         self.chat_log.appendPlainText(f"You: {text}")
         client = self._client()
@@ -206,15 +221,19 @@ class Main(QMainWindow):
                 try:
                     resp = client.chat.completions.create(
                         model=os.getenv("AUTOBUILD_MODEL","gpt-4o-mini"),
-                        messages=[{"role":"system","content":"You assist with code edits and git operations."},
-                                  {"role":"user","content":text}],
+                        messages=[
+                            {"role":"system","content":"You assist with code edits and git operations."},
+                            {"role":"user","content":text}
+                        ],
                         temperature=0.2,
                     )
                 except AttributeError:
                     resp = client.chat_completions.create(
                         model=os.getenv("AUTOBUILD_MODEL","gpt-4o-mini"),
-                        messages=[{"role":"system","content":"You assist with code edits and git operations."},
-                                  {"role":"user","content":text}],
+                        messages=[
+                            {"role":"system","content":"You assist with code edits and git operations."},
+                            {"role":"user","content":text}
+                        ],
                         temperature=0.2,
                     )
                 msg = resp.choices[0].message
@@ -237,5 +256,6 @@ def main():
     app = QApplication(sys.argv)
     win = Main(); win.show()
     sys.exit(app.exec())
+
 if __name__ == "__main__":
     main()
