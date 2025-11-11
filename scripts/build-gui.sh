@@ -1,56 +1,29 @@
 #!/usr/bin/env bash
 set -euo pipefail
-
-# Always run from repo root
 cd "$(dirname "$0")/.."
 
-# Detect entry (supports either tools/… or repo root)
-if [[ -f tools/autobuild_desktop_tk.py ]]; then
-  ENTRY="tools/autobuild_desktop_tk.py"
-elif [[ -f autobuild_desktop_tk.py ]]; then
-  ENTRY="autobuild_desktop_tk.py"
-else
-  echo "❌ Could not find autobuild_desktop_tk.py (tools/ or root)."
-  exit 1
-fi
-
-# Ensure default config exists (harmless if already there)
-if [[ ! -f config/autobuild.yml ]]; then
-  mkdir -p config
-  cat > config/autobuild.yml <<'YAML'
+mkdir -p config
+test -f config/autobuild.yml || cat > config/autobuild.yml <<'YAML'
 project_name: "Autobuilder"
-workspace_dir: "./"
-logs_dir: "./logs"
-build:
-  output_dir: "./dist"
-  include_timestamp: false
-  optimize: 0
-features:
-  textual_tui: true
-  tkinter_gui: true
+projects:
+  - { name: "Autobuilder", path: "." }
 YAML
-fi
 
-# Clean GUI work/spec and old bundle (keep other dist outputs)
-rm -rf build/gui build/spec/Autobuild_Desktop "dist/Autobuild Desktop.app"
+rm -rf build/gui_qt build/spec/Autobuild_Qt "dist/Autobuild Desktop.app"
 
-# Build the Tk GUI as a .app bundle with pywebview bundled
 pyinstaller \
   --name "Autobuild Desktop" \
   --windowed \
-  --clean --noconfirm \
+  --noconfirm --clean \
   --distpath dist \
-  --workpath build/gui \
-  --specpath build/spec/Autobuild_Desktop \
-  --hidden-import webview \
-  --hidden-import webview.platforms.cocoa \
-  --collect-data webview \
-  --collect-all webview \
-  "$ENTRY"
+  --workpath build/gui_qt \
+  --specpath build/spec/Autobuild_Qt \
+  --hidden-import PySide6 \
+  --hidden-import PySide6.QtWebEngineWidgets \
+  --collect-submodules PySide6 \
+  --collect-data PySide6 \
+  tools/autobuild_desktop_qt.py
 
 echo
 echo "✅ Built: dist/Autobuild Desktop.app"
-echo "Run with logs:"
-echo "  \"dist/Autobuild Desktop.app/Contents/MacOS/Autobuild Desktop\""
-echo "Or simply open:"
-echo "  open \"dist/Autobuild Desktop.app\""
+echo 'Run: open "dist/Autobuild Desktop.app"'
