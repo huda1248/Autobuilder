@@ -134,11 +134,18 @@ class ChatPane(ttk.Frame):
                 ttk.Button(self, text="Open ChatGPT (web)", command=self.open_web).pack(padx=6, pady=(0,8))
             else:
                 self.log.insert("end", "Tip: pip install pywebview\n")
-    def open_web(self):
+    ## PATCHED
+def open_web(self):
         def _run():
             webview.create_window("ChatGPT", "https://chatgpt.com", width=1200, height=800)
             webview.start(gui='cocoa')
-        threading.Thread(target=_run, daemon=True).start()
+        # Launch helper process so Cocoa runs on its own main thread
+helper = '''
+import webview
+webview.create_window("ChatGPT", "https://chatgpt.com", width=1200, height=800)
+webview.start(gui="cocoa")
+'''
+subprocess.Popen([sys.executable, "-c", helper])
     def send(self):
         text = self.entry.get().strip()
         if not text: return
