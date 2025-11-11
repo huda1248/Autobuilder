@@ -6,6 +6,7 @@ from datetime import datetime
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import yaml
+import webbrowser
 
 try:
     import webview
@@ -119,59 +120,44 @@ class FolderTree(ttk.Frame):
         full = Path(self.tree.set(node, "full"))
         if full.is_file(): self.on_open(full)
 
+
 class ChatPane(ttk.Frame):
+    """Chat panel: uses OpenAI API if OPENAI_API_KEY is set, otherwise opens chatgpt.com."""
     def __init__(self, master):
         super().__init__(master)
         ttk.Label(self, text="Chat", font=("Helvetica", 12, "bold")).pack(anchor="w", padx=6, pady=4)
-        self.log = tk.Text(self, height=18, wrap="word"); self.log.pack(fill="both", expand=True, padx=6)
-        row = ttk.Frame(self); row.pack(fill="x", padx=6, pady=6)
-        self.entry = ttk.Entry(row); self.entry.pack(side="left", fill="x", expand=True, padx=(0,6))
-        ttk.Button(row, text="Send", command=self.send).pack(side="left")
-        self.client = OpenAI(api_key=_OPENAI_KEY) if (_HAS_OPENAI) else None
-        if not _HAS_OPENAI:
-            self.log.insert("end", "No OPENAI_API_KEY set.\n")
-            if _HAS_WEBVIEW:
-                ttk.Button(self, text="Open ChatGPT (web)", command=self.open_web).pack(padx=6, pady=(0,8))
-            else:
-                self.log.insert("end", "Tip: pip install pywebview\n")
-    ## PATCHED
-def open_web(self):
-        def _run():
-            webview.create_window("ChatGPT", "https://chatgpt.com", width=1200, height=800)
-            webview.start(gui='cocoa')
-        # Launch helper process so Cocoa runs on its own main thread
-helper = '''
-import webview
-webview.create_window("ChatGPT", "https://chatgpt.com", width=1200, height=800)
-webview.start(gui="cocoa")
-'''
-subprocess.Popen([sys.executable, "-c", helper])
-    def send(self):
-        text = self.entry.get().strip()
-        if not text: return
-        self.entry.delete(0,"end"); self.log.insert("end", f"🧑‍💻 You: {text}\n"); self.log.see("end")
-        if not self.client:
-            self.log.insert("end", "(No API key; use Open ChatGPT button.)\n"); return
-        q = queue.Queue()
-        def worker():
-            try:
-                resp = self.client.chat.completions.create(
-                    model=os.getenv("AUTOBUILD_MODEL","gpt-4o-mini"),
-                    messages=[{"role":"system","content":"You assist with code edits and git ops."},
-                              {"role":"user","content":text}],
-                    temperature=0.2,
-                )
-                q.put(resp.choices[0].message.content or "")
-            except Exception as e:
-                q.put(f"[ERROR] {e}")
-        threading.Thread(target=worker, daemon=True).start()
-        def pump():
-            try:
-                ans = q.get_nowait(); self.log.insert("end", f"🤖 {ans}\n"); self.log.see("end")
-            except queue.Empty:
-                self.after(60, pump)
-        self.after(60, pump)
 
+        self.log = tk.Text(self, height=18, wrap="word")
+        self.log.pack(fill="both", expand=True, padx=6)
+
+        row = ttk.Frame(self)
+        row.pack(fill="x", padx=6, pady=6)
+        self.entry = ttk.Entry(row)
+        self.entry.pack(side="left", fill="x", expand=True, padx=(0,6))
+        ttk.Button(row, text="Send", command=self.send).pack(side="left")
+
+        # Wire OpenAI client only if key exists
+        try:
+            from openai import OpenAI
+            self.client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY") or "")
+            self._has_api = bool(os.environ.get("OPENAI_API_KEY"))
+        except Exception:
+            self.client = None
+            self._has_api = False
+
+        if not self._has_api:
+            self.log.insert("end", "No OPENAI_API_KEY set.
+")
+            try:
+                import webview  # noqa: F401
+                ttk.Button(self, text="Open ChatGPT (web)", command=self.open_web).pack(padx=6, pady=(0,8))
+            except Exception:
+                self.log.insert("end", "Tip: pip install pywebview to open chatgpt.com in a window.
+")
+
+    def open_web(self):
+        """Open chatgpt.com via pywebview helper process; fallback to default browser."""
+        helper = 
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
