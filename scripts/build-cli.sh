@@ -1,10 +1,21 @@
 #!/usr/bin/env bash
 set -euo pipefail
+
+# Always run from repo root
 cd "$(dirname "$0")/.."
 
-# Ensure default config exists
-if [ ! -f config/autobuild.yml ]; then
-  echo "Creating default config/autobuild.yml"
+# Detect entry (supports either tools/… or repo root)
+if [[ -f tools/autobuild_textual.py ]]; then
+  ENTRY="tools/autobuild_textual.py"
+elif [[ -f autobuild_textual.py ]]; then
+  ENTRY="autobuild_textual.py"
+else
+  echo "❌ Could not find autobuild_textual.py (tools/ or root)."
+  exit 1
+fi
+
+# Ensure default config exists (harmless if already there)
+if [[ ! -f config/autobuild.yml ]]; then
   mkdir -p config
   cat > config/autobuild.yml <<'YAML'
 project_name: "Autobuilder"
@@ -20,17 +31,26 @@ features:
 YAML
 fi
 
-# Clean only CLI work/spec paths (NOT dist/)
-rm -rf build/cli build/spec/AutobuildTerminal
+# Clean CLI work/spec and just the previous binary
+rm -rf build/cli build/spec/AutobuildTerminal dist/AutobuildTerminal
 
+# Build the Textual TUI single-file binary (bundle rich/textual/webview assets)
 pyinstaller \
   --onefile \
   --name "AutobuildTerminal" \
+  --clean --noconfirm \
   --distpath dist \
   --workpath build/cli \
   --specpath build/spec/AutobuildTerminal \
-  tools/autobuild_textual.py
+  --hidden-import webview \
+  --hidden-import webview.platforms.cocoa \
+  --collect-data webview \
+  --collect-all webview \
+  --collect-all textual \
+  --collect-all rich \
+  "$ENTRY"
 
 echo
 echo "✅ Built: dist/AutobuildTerminal"
-echo "Run test: ./dist/AutobuildTerminal --help || ./dist/AutobuildTerminal"
+echo "Run:"
+echo "  ./dist/AutobuildTerminal"
