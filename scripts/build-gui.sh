@@ -2,14 +2,16 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
+# Full clean to avoid stale PySide6 framework symlinks
+rm -rf dist build/gui_qt build/spec/Autobuild_Qt \
+  "$HOME/Library/Application Support/pyinstaller"
+
 mkdir -p config
 test -f config/autobuild.yml || cat > config/autobuild.yml <<'YAML'
 project_name: "Autobuilder"
 projects:
   - { name: "Autobuilder", path: "." }
 YAML
-
-rm -rf build/gui_qt build/spec/Autobuild_Qt "dist/Autobuild Desktop.app"
 
 pyinstaller \
   --name "Autobuild Desktop" \
