@@ -3,7 +3,7 @@ import os, sys, subprocess, threading, queue
 from pathlib import Path
 import yaml
 
-from PySide6.QtCore import Qt, QUrl, QProcess, QTimer
+from PySide6.QtCore import Qt, QUrl, QProcess, QTimer, QDir
 from PySide6.QtGui import QAction, QFont, QTextOption
 from PySide6.QtWidgets import (
     QApplication, QWidget, QMainWindow, QSplitter, QFileSystemModel, QTreeView,
