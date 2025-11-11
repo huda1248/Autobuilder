@@ -1,17 +1,16 @@
 # tools/autobuild_desktop_tk.py
 import os
 import subprocess
-import sys
 import threading
 from datetime import datetime
 from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
-import yaml
 
 # NEW: embed real chatgpt.com in a native WebKit window
 import webview  # pip install pywebview
 
+# ---------- repo paths ----------
 ROOT = Path.cwd()
 CONFIG = ROOT / "config" / "autobuild.yml"
 CUR = ROOT / ".autobuild_current"
@@ -19,6 +18,7 @@ CUR = ROOT / ".autobuild_current"
 # ---------- config & project helpers ----------
 def cfg():
     try:
+        import yaml
         return yaml.safe_load(CONFIG.read_text(encoding="utf-8")) or {}
     except Exception:
         return {"projects": []}
@@ -59,19 +59,26 @@ def run_stream(cmd, cwd, out_text: tk.Text):
         out_text.see("end")
     threading.Thread(target=worker, daemon=True).start()
 
-# ---------- the app ----------
+HELP = """\
+Slash-like actions in Desktop:
+- Use the buttons below to scaffold, apply patches, commit & push.
+- For full shell access, use the Terminal or the TUI binary.
+"""
+
+# ---------- the Tk app ----------
 class App(tk.Tk):
     def __init__(self):
         super().__init__()
 
-        # Build tag (clearly visible)
-        build_tag = f"{os.path.basename(__file__)} @ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        # Build tag (you can SEE fresh builds)
+        build_tag = f"{Path(__file__).name} @ {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
         self.title(f"Autobuild Desktop — {build_tag}")
-        self.geometry("980x660")
+        self.geometry("1080x700")
 
         # Projects & active path
         self.projs = dict(projects()) or {"Autobuilder": ROOT}
         self.active = read_cur() if read_cur() in self.projs.values() else next(iter(self.projs.values()))
+        self.cfg = cfg()
 
         # Top bar
         top = ttk.Frame(self)
@@ -91,37 +98,32 @@ class App(tk.Tk):
         # NEW: Open ChatGPT (real chatgpt.com in a webview)
         ttk.Button(top, text="Open ChatGPT", command=self.open_chatgpt).pack(side="right", padx=6)
 
-        
-
-        # Build tag banner (so you can SEE freshness)
+        # Build tag banner
         banner = ttk.Frame(self)
         banner.pack(fill="x", padx=8)
         ttk.Label(banner, text="✅ Fresh build running", font=("Helvetica", 14)).pack(anchor="w")
-        ttk.Label(banner, text=f"__file__: {__file__}", wraplength=940).pack(anchor="w")
-        ttk.Label(banner, text=f"cwd: {os.getcwd()}").pack(anchor="w", pady=(0, 6))
+        ttk.Label(banner, text=f"__file__: {__file__}", wraplength=1000).pack(anchor="w")
+        ttk.Label(banner, text=f"cwd: {Path.cwd()}").pack(anchor="w", pady=(0, 6))
 
-        # Notebook
+        # Notebook (tabs)
         nb = ttk.Notebook(self)
         nb.pack(fill="x", padx=8)
 
         # Scaffold tab
         scf = ttk.Frame(nb)
         nb.add(scf, text="Scaffold")
-
         ttk.Label(scf, text="Name").grid(row=0, column=0, padx=6, pady=6, sticky="w")
         self.sc_name = ttk.Entry(scf, width=24)
         self.sc_name.insert(0, "hello_world")
         self.sc_name.grid(row=0, column=1, sticky="w")
-
         ttk.Label(scf, text="Out").grid(row=0, column=2, padx=6, sticky="w")
         self.sc_out = ttk.Entry(scf, width=24)
         self.sc_out.insert(0, "./out_cli")
         self.sc_out.grid(row=0, column=3, sticky="w")
-
         ttk.Button(scf, text="Run Scaffold", command=self.do_scaffold)\
             .grid(row=0, column=4, padx=6, sticky="w")
 
-        # Patch/apply area
+        # Patch / Commit / Push controls
         gf = ttk.Frame(self)
         gf.pack(fill="x", padx=8, pady=4)
 
@@ -140,7 +142,18 @@ class App(tk.Tk):
         self.api_port = ttk.Entry(gf, width=8)
         self.api_port.insert(0, "8080")
         self.api_port.grid(row=1, column=3, sticky="w")
-        ttk.Button(gf, text="Start API", command=self.start_api).grid(row=1, column=4, padx=6, sticky="w")
+        ttk.Button(gf, text="Start/Stop API", command=self.start_api).grid(row=1, column=4, padx=6, sticky="w")
+
+        # Git actions row (Commit / Push / PR)
+        btns = ttk.Frame(gf)
+        btns.grid(row=2, column=0, columnspan=5, sticky="w", pady=(6, 0))
+        def _run(cmd):
+            run_stream(["bash","-lc", cmd], cwd=str(self.active), out_text=self.out)
+        ttk.Button(btns, text="Commit", command=lambda:_run(
+            f'git add -A && git commit -m "{self.commit_msg.get().strip() or "assistant: update"}" || true'
+        )).pack(side="left", padx=(0,6))
+        ttk.Button(btns, text="Push", command=lambda:_run('git push || true')).pack(side="left", padx=(0,6))
+        ttk.Button(btns, text="Open PR", command=lambda:_run('gh pr create --fill || gh pr view --web || true')).pack(side="left", padx=(0,6))
 
         # Console output (streamed)
         out_frame = ttk.Frame(self)
@@ -150,6 +163,7 @@ class App(tk.Tk):
         sb = ttk.Scrollbar(out_frame, orient="vertical", command=self.out.yview)
         sb.pack(side="right", fill="y")
         self.out.configure(yscrollcommand=sb.set)
+        self.out.insert("end", HELP + "\n")
 
     # ---------- actions ----------
     def use_project(self):
@@ -183,20 +197,33 @@ class App(tk.Tk):
 
     def do_patch(self):
         patch_path = self.patch.get().strip()
-        msg = self.commit_msg.get().strip() or "update"
+        msg = self.commit_msg.get().strip() or "assistant: update"
         if not patch_path:
             messagebox.showerror("No patch", "Select a patch file first.")
             return
-        cmd = ["bash", "-lc", f'git apply "{patch_path}" && git add -A && git commit -m "{msg}" || true']
+        cmd = ["bash", "-lc", f'git apply "{patch_path}" --reject --whitespace=fix && git add -A && git commit -m "{msg}" || true']
         run_stream(cmd, cwd=str(self.active), out_text=self.out)
 
     def start_api(self):
+        # toggle start/stop simple demo server
+        if getattr(self, "_api_proc", None) and self._api_proc.poll() is None:
+            self._api_proc.terminate()
+            self.out.insert("end", "🛑 API stopped\n"); self.out.see("end")
+            self._api_proc = None
+            return
         port = self.api_port.get().strip() or "8080"
-        # Placeholder demo command; replace with your real server entry-point if needed
-        cmd = ["bash", "-lc", f'python -m http.server {port}']
-        run_stream(cmd, cwd=str(self.active), out_text=self.out)
+        self._api_proc = subprocess.Popen(
+            ["python","-m","http.server", port],
+            cwd=str(self.active),
+            stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True
+        )
+        def pump():
+            for line in self._api_proc.stdout:  # type: ignore
+                self.out.insert("end", line); self.out.see("end")
+        threading.Thread(target=pump, daemon=True).start()
+        self.out.insert("end", f"🚀 API started on http://localhost:{port}\n"); self.out.see("end")
 
-# ---------- NEW: open ChatGPT (chatgpt.com) ----------
+    # ---------- NEW: open ChatGPT (chatgpt.com) ----------
     def open_chatgpt(self):
         # Launch webview on a background thread so Tk stays responsive
         def _run():
