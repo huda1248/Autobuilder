@@ -1,6 +1,4 @@
 # tools/autobuild_desktop_tk.py
-import threading
-import webview
 import os
 import subprocess
 import sys
@@ -10,6 +8,9 @@ from pathlib import Path
 import tkinter as tk
 from tkinter import ttk, filedialog, messagebox
 import yaml
+
+# NEW: embed real chatgpt.com in a native WebKit window
+import webview  # pip install pywebview
 
 ROOT = Path.cwd()
 CONFIG = ROOT / "config" / "autobuild.yml"
@@ -85,8 +86,11 @@ class App(tk.Tk):
 
         ttk.Label(top, text="Active:").pack(side="left", padx=12)
         self.active_lbl = ttk.Label(top, text=str(self.active), foreground="green")
-        ttk.Button(top, text="Open ChatGPT", command=self.open_chatgpt).pack(side="right", padx=6)
         self.active_lbl.pack(side="left", padx=4)
+
+        # NEW: Open ChatGPT (real chatgpt.com in a webview)
+        ttk.Button(top, text="Open ChatGPT", command=self.open_chatgpt).pack(side="right", padx=6)
+
         
 
         # Build tag banner (so you can SEE freshness)
@@ -191,6 +195,23 @@ class App(tk.Tk):
         # Placeholder demo command; replace with your real server entry-point if needed
         cmd = ["bash", "-lc", f'python -m http.server {port}']
         run_stream(cmd, cwd=str(self.active), out_text=self.out)
+
+# ---------- NEW: open ChatGPT (chatgpt.com) ----------
+    def open_chatgpt(self):
+        # Launch webview on a background thread so Tk stays responsive
+        def _run():
+            webview.create_window(
+                title="ChatGPT",
+                url="https://chatgpt.com",
+                width=1200,
+                height=800,
+                resizable=True,
+                confirm_close=False,
+                easy_drag=False,
+            )
+            # Explicitly choose Cocoa backend on macOS
+            webview.start(gui='cocoa')
+        threading.Thread(target=_run, daemon=True).start()
 
 def main():
     app = App()
