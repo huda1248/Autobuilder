@@ -1,4 +1,6 @@
 # tools/autobuild_desktop_tk.py
+import threading
+import webview
 import os
 import subprocess
 import sys
