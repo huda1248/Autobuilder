@@ -26,7 +26,7 @@ def projects():
     out = []
     for p in cfg().get("projects", []):
         name = p.get("name") or "Autobuilder"
-        path = Path(p.get("path","."))).expanduser().resolve()
+        path = Path(p.get("path",".")).expanduser().resolve()
         out.append((name, path))
     return out or [("Autobuilder", ROOT)]
 
