@@ -17,13 +17,13 @@ else
 fi
 echo "Using GUI entry: ${SCRIPT}"
 
-# --- Hard clean to avoid stale Qt symlink collisions on macOS ---
+# --- Hard clean (prevents Qt symlink collisions) ---
 pkill -f "Autobuild Desktop" >/dev/null 2>&1 || true
-rm -rf dist build/gui_qt build/spec/Autobuild_Qt \
+rm -rf "dist/Autobuild Desktop.app" dist build/gui_qt build/spec/Autobuild_Qt \
   "$HOME/Library/Application Support/pyinstaller"
 find . -name "*.spec" -delete
 
-# --- Ensure minimal config exists (idempotent) ---
+# --- Ensure minimal config ---
 mkdir -p config
 test -f config/autobuild.yml || cat > config/autobuild.yml <<'YAML'
 project_name: "Autobuilder"
@@ -31,7 +31,7 @@ projects:
   - { name: "Autobuilder", path: "." }
 YAML
 
-# --- Common flags as array ---
+# --- Common flags ---
 COMMON=(
   --name "Autobuild Desktop"
   --windowed
@@ -42,44 +42,53 @@ COMMON=(
 )
 
 if [ "${USING_QT}" = "1" ]; then
-  echo "Building Qt/WebEngine bundle (broad include, Qt3D excluded)…"
+  echo "Building Qt/WebEngine bundle (focused include; exclude 3D/QML)…"
 
   QT_FLAGS=(
-    # core widgets + webengine
+    # Core widgets + webengine
     --hidden-import PySide6.QtCore
     --hidden-import PySide6.QtGui
     --hidden-import PySide6.QtWidgets
     --hidden-import PySide6.QtWebEngineWidgets
     --hidden-import PySide6.QtWebChannel
 
-    # “more of Qt” you may want available
+    # A few common extras (safe)
     --hidden-import PySide6.QtNetwork
     --hidden-import PySide6.QtPrintSupport
     --hidden-import PySide6.QtSvg
     --hidden-import PySide6.QtSvgWidgets
-    --hidden-import PySide6.QtSql
-    --hidden-import PySide6.QtMultimedia
-    --hidden-import PySide6.QtMultimediaWidgets
     --hidden-import PySide6.QtOpenGL
     --hidden-import PySide6.QtOpenGLWidgets
     --hidden-import PySide6.QtWebSockets
     --hidden-import PySide6.QtPdf
     --hidden-import PySide6.QtPdfWidgets
-    --hidden-import PySide6.QtQuick
-    --hidden-import PySide6.QtQuickWidgets
 
-    # data & binaries for WebEngine (keeps the app working)
-    --collect-data PySide6
+    # WebEngine runtime deps (targeted)
     --collect-submodules PySide6.QtWebEngineWidgets
-    --collect-binaries PySide6.QtWebEngineCore
+    --collect-binaries   PySide6.QtWebEngineCore
+    --copy-metadata      PySide6
 
-    # EXCLUDE ONLY the Qt3D stack — this avoids the duplicate symlink crash
+    # EXCLUDE stacks that cause collisions or pull QML/3D
     --exclude-module PySide6.Qt3DAnimation
     --exclude-module PySide6.Qt3DCore
     --exclude-module PySide6.Qt3DRender
     --exclude-module PySide6.Qt3DExtras
     --exclude-module PySide6.Qt3DInput
     --exclude-module PySide6.Qt3DLogic
+
+    # Not using QML/Quick/Quick3D/Designer: exclude to avoid DesignHelpers noise
+    --exclude-module PySide6.QtQml
+    --exclude-module PySide6.QtQuick
+    --exclude-module PySide6.QtQuickWidgets
+    --exclude-module PySide6.QtQuick3D
+    --exclude-module PySide6.QtDesigner
+    --exclude-module PySide6.QtGraphs
+    --exclude-module PySide6.QtGraphsWidgets
+
+    # Avoid shipping SQL/Multimedia if not needed (uncomment to include)
+    # --hidden-import PySide6.QtSql
+    # --hidden-import PySide6.QtMultimedia
+    # --hidden-import PySide6.QtMultimediaWidgets
   )
 
   pyinstaller "${COMMON[@]}" "${QT_FLAGS[@]}" "$SCRIPT"
